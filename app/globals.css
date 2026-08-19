@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* This app has no dark theme — every component hardcodes light colors
+     (bg-white, text-gray-900, etc). Without this, some browsers/OSes still
+     auto-darken native form controls under a dark system preference, which
+     can make typed input text invisible (near-white on a hardcoded white
+     field). */
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* Brand wordmark font (sidebar logo only — font-dynapuff). */
+  --font-dynapuff: var(--font-dynapuff);
+
+  /* Brand colors — matches website/app/globals.css for cross-app consistency. */
+  --color-primary: #006e5c;
+  /* Darker shade of primary, for small accent text / link hovers
+     (text-primary-dark) where the base primary alone reads a bit flat. */
+  --color-primary-dark: #005345;
+  --color-black: #141414;
+  --color-white: #ffffff;
+
+  /* shadcn/ui semantic tokens consumed by components/shared/ui/*.
+     Mapped onto the brand palette above — without these, utilities like
+     `text-primary-foreground` or `bg-destructive` silently produce no CSS
+     (Tailwind v4 only generates a utility if its --color-* token exists),
+     so e.g. button text would fall back to an undefined/inherited color
+     instead of the intended one. */
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: #f4f4f5;
+  --color-secondary-foreground: var(--color-black);
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: var(--color-white);
+  --color-accent: #f4f4f5;
+  --color-accent-foreground: var(--color-black);
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+  --color-card: var(--color-white);
+  --color-card-foreground: var(--color-black);
+  --color-input: #e4e4e7;
+  --color-border: #e4e4e7;
+  --color-ring: var(--color-primary);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

@@ -1,7 +1,6 @@
 "use server";
 
 import { auth } from "@/auth";
-import { unstable_cache } from "next/cache";
 
 export interface UserProfile {
   id: string;
@@ -113,7 +112,7 @@ export async function getUserData(): Promise<UserDataResponse<UserProfile>> {
     const response = await fetch(`${apiUrl}/api/user`, {
       method: "GET",
       headers: authHeader(token),
-      next: { tags: ["user_profile"], revalidate: 360 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -156,7 +155,7 @@ export async function getCurrentUserDetails(): Promise<
     const response = await fetch(`${apiUrl}/api/v1/users/${userId}`, {
       method: "GET",
       headers: authHeader(token),
-      next: { tags: ["user_full_details"], revalidate: 120 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -199,7 +198,7 @@ export async function getUserById(
     const response = await fetch(`${apiUrl}/api/v1/users/${id}`, {
       method: "GET",
       headers: authHeader(token),
-      next: { tags: [`user_full_details_${id}`], revalidate: 120 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -294,7 +293,7 @@ export async function getAllUserData(
     const response = await fetch(`${apiUrl}/api/v1/users?${query}`, {
       method: "GET",
       headers: authHeader(token),
-      next: { tags: ["users_list"], revalidate: 120 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -398,6 +397,7 @@ export async function userSubscriptionByIds(
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        cache: "no-store",
       },
     );
 
@@ -453,7 +453,7 @@ export async function userSubscriptionById(
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        next: { tags: ["subscriptions_list"] },
+        cache: "no-store",
       },
     );
 
@@ -486,7 +486,7 @@ export async function getUserDataTest(
       {
         method: "GET",
         headers,
-        next: { tags: ["user_profile"], revalidate: 360 },
+        cache: "no-store",
       },
     );
 
@@ -513,15 +513,3 @@ export async function getUserDataTest(
     };
   }
 }
-
-export const getCachedAllUsersData = unstable_cache(
-  async (page: number, pageSize: number) => getAllUserData(page, pageSize),
-  ["users_list_cache"],
-  { revalidate: 120 },
-);
-
-export const getCachedUserProfileData = unstable_cache(
-  async (headers: HeadersInit) => getUserDataTest(headers),
-  ["user_profile_cache"],
-  { revalidate: 360 },
-);

@@ -21,26 +21,62 @@ const dynaPuff = DynaPuff({
   weight: ["600", "700"],
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://admin.goconverto.com";
+const PRIMARY_SITE_URL = "https://dashboard.fishmeaqua.com";
+const deploymentHost =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+  process.env.VERCEL_URL;
+const SITE_URL = deploymentHost
+  ? deploymentHost.startsWith("http")
+    ? deploymentHost
+    : `https://${deploymentHost}`
+  : PRIMARY_SITE_URL;
+const META_TITLE = "Fish Me Aqua Dashboard";
+const META_DESCRIPTION =
+  "Secure staff dashboard for managing Fish Me Aqua products, orders, customers, reviews, messages, and commerce analytics.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Go Converto Admin",
-  description: "Internal admin panel for managing the Go Converto platform.",
+  applicationName: META_TITLE,
+  title: {
+    default: META_TITLE,
+    template: `%s | ${META_TITLE}`,
+  },
+  description: META_DESCRIPTION,
+  alternates: {
+    canonical: PRIMARY_SITE_URL,
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
   openGraph: {
-    title: "Go Converto Admin",
-    description: "Internal admin panel for managing the Go Converto platform.",
-    url: SITE_URL,
-    siteName: "Go Converto Admin",
+    title: META_TITLE,
+    description: META_DESCRIPTION,
+    url: PRIMARY_SITE_URL,
+    siteName: META_TITLE,
     type: "website",
+    locale: "en_US",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 2400,
+        height: 1260,
+        alt: "Fish Me Aqua Dashboard",
+        type: "image/png",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Go Converto Admin",
-    description: "Internal admin panel for managing the Go Converto platform.",
+    title: META_TITLE,
+    description: META_DESCRIPTION,
+    images: ["/opengraph-image.png"],
   },
-  // Internal staff tool — never index it.
-  robots: { index: false, follow: false },
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
 };
 
 export default function RootLayout({

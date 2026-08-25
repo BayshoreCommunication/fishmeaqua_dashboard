@@ -15,8 +15,10 @@ import { toast } from "react-hot-toast";
 import {
   BiCheckCircle,
   BiPackage,
+  BiPencil,
   BiPlus,
   BiReceipt,
+  BiShow,
   BiSolidTruck,
   BiTimeFive,
   BiTrash,
@@ -333,13 +335,29 @@ const OrderList = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <button
-                          onClick={() => handleDelete(order)}
-                          className="text-red-500 hover:text-red-700 transition-colors p-1"
-                          title="Delete order"
-                        >
-                          <BiTrash size={18} />
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/orders/${order._id}`}
+                            className="text-gray-500 hover:text-gray-900 transition-colors p-1"
+                            title="View order"
+                          >
+                            <BiShow size={18} />
+                          </Link>
+                          <Link
+                            href={`/orders/edit/${order._id}`}
+                            className="text-gray-500 hover:text-gray-900 transition-colors p-1"
+                            title="Edit order"
+                          >
+                            <BiPencil size={18} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(order)}
+                            className="text-red-500 hover:text-red-700 transition-colors p-1"
+                            title="Delete order"
+                          >
+                            <BiTrash size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

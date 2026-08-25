@@ -2,22 +2,19 @@
 
 import { createOrderAction, PaymentMethod } from "@/app/actions/order";
 import { Product, listProductsAction } from "@/app/actions/product";
+import {
+  getAllDivisions,
+  getCityCorporationsByDistrict,
+  getDistrictsByDivision,
+  getThanasByCityCorporation,
+  getUnionsByUpazila,
+  getUpazilasByDistrict,
+} from "bangladesh-geo-data";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { BiArrowBack, BiPackage, BiPlus, BiTrash } from "react-icons/bi";
-
-const BD_DIVISIONS = [
-  "Dhaka",
-  "Chattogram",
-  "Rajshahi",
-  "Khulna",
-  "Barishal",
-  "Sylhet",
-  "Rangpur",
-  "Mymensingh",
-] as const;
 
 const DELIVERY_ZONES = ["Inside Dhaka", "Outside Dhaka"] as const;
 
@@ -54,13 +51,100 @@ const OrderAdd = () => {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
 
-  const [division, setDivision] = useState("");
-  const [district, setDistrict] = useState("");
-  const [upazila, setUpazila] = useState("");
-  const [postOffice, setPostOffice] = useState("");
+  const [divisionId, setDivisionId] = useState("");
+  const [districtId, setDistrictId] = useState("");
+  const [upazilaId, setUpazilaId] = useState("");
+  const [postOfficeId, setPostOfficeId] = useState("");
   const [postCode, setPostCode] = useState("");
   const [area, setArea] = useState("");
   const [zone, setZone] = useState("");
+  // Dhaka city (zone === "Inside Dhaka") is addressed by City Corporation +
+  // Thana rather than Upazila + Post Office — a separate branch of fields.
+  const [cityCorpId, setCityCorpId] = useState("");
+  const [thanaId, setThanaId] = useState("");
+
+  const divisions = useMemo(() => getAllDivisions(), []);
+  const districtOptions = divisionId ? getDistrictsByDivision(divisionId) : [];
+  const upazilaOptions = districtId ? getUpazilasByDistrict(districtId) : [];
+  // Each union record carries its own real post office name + postal code —
+  // that's the actual "Post Office" the dropdown shows and selects from.
+  const postOfficeOptions = upazilaId ? getUnionsByUpazila(upazilaId) : [];
+
+  const divisionName = divisions.find((d) => d.id === divisionId)?.name || "";
+  const districtName =
+    districtOptions.find((d) => d.id === districtId)?.name || "";
+  const upazilaName =
+    upazilaOptions.find((u) => u.id === upazilaId)?.name || "";
+  const postOfficeName =
+    postOfficeOptions.find((u) => u.id === postOfficeId)?.postOffice || "";
+
+  const isDhakaDivision = divisionName === "Dhaka";
+  const dhakaDistrictId = isDhakaDivision
+    ? districtOptions.find((d) => d.name === "Dhaka")?.id || ""
+    : "";
+  const cityCorpOptions = dhakaDistrictId
+    ? getCityCorporationsByDistrict(dhakaDistrictId)
+    : [];
+  const thanaOptions = cityCorpId ? getThanasByCityCorporation(cityCorpId) : [];
+  const cityCorpName =
+    cityCorpOptions.find((c) => c.id === cityCorpId)?.name || "";
+  const thanaName = thanaOptions.find((t) => t.id === thanaId)?.name || "";
+
+  const isInsideDhaka = isDhakaDivision && zone === "Inside Dhaka";
+  // The shippingAddress schema has no dedicated city-corporation/thana
+  // fields, so inside Dhaka city those map onto the district/upazila/
+  // postOffice slots the rural flow would otherwise use.
+  const effectiveDistrict = isInsideDhaka ? "Dhaka" : districtName;
+  const effectiveUpazila = isInsideDhaka ? cityCorpName : upazilaName;
+  const effectivePostOffice = isInsideDhaka ? thanaName : postOfficeName;
+
+  const handleDivisionChange = (id: string) => {
+    setDivisionId(id);
+    setDistrictId("");
+    setUpazilaId("");
+    setPostOfficeId("");
+    setPostCode("");
+    setCityCorpId("");
+    setThanaId("");
+    // Only Dhaka division ever needs the Inside/Outside choice — everywhere
+    // else is unambiguously outside Dhaka.
+    const newDivisionName = divisions.find((d) => d.id === id)?.name || "";
+    setZone(newDivisionName === "Dhaka" ? "" : "Outside Dhaka");
+  };
+
+  const handleZoneChange = (value: string) => {
+    setZone(value);
+    setDistrictId("");
+    setUpazilaId("");
+    setPostOfficeId("");
+    setPostCode("");
+    setCityCorpId("");
+    setThanaId("");
+  };
+
+  const handleDistrictChange = (id: string) => {
+    setDistrictId(id);
+    setUpazilaId("");
+    setPostOfficeId("");
+    setPostCode("");
+  };
+
+  const handleUpazilaChange = (id: string) => {
+    setUpazilaId(id);
+    setPostOfficeId("");
+    setPostCode("");
+  };
+
+  const handlePostOfficeChange = (id: string) => {
+    setPostOfficeId(id);
+    const selected = postOfficeOptions.find((u) => u.id === id);
+    setPostCode(selected?.postalCode || "");
+  };
+
+  const handleCityCorpChange = (id: string) => {
+    setCityCorpId(id);
+    setThanaId("");
+  };
 
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedQuantity, setSelectedQuantity] = useState(1);
@@ -152,10 +236,10 @@ const OrderAdd = () => {
       customerPhone,
       customerEmail: customerEmail || undefined,
       shippingAddress: {
-        division: division || undefined,
-        district: district || undefined,
-        upazila: upazila || undefined,
-        postOffice: postOffice || undefined,
+        division: divisionName || undefined,
+        district: effectiveDistrict || undefined,
+        upazila: effectiveUpazila || undefined,
+        postOffice: effectivePostOffice || undefined,
         postCode: postCode || undefined,
         area: area || undefined,
         zone: (zone || undefined) as "Inside Dhaka" | "Outside Dhaka" | undefined,
@@ -249,66 +333,159 @@ const OrderAdd = () => {
                 <div className="space-y-1.5">
                   <label className={labelClass}>Division</label>
                   <select
-                    value={division}
-                    onChange={(e) => setDivision(e.target.value)}
+                    value={divisionId}
+                    onChange={(e) => handleDivisionChange(e.target.value)}
                     className={inputClass}
                   >
                     <option value="">Select division</option>
-                    {BD_DIVISIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
+                    {divisions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Delivery Zone</label>
-                  <select
-                    value={zone}
-                    onChange={(e) => setZone(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select zone</option>
-                    {DELIVERY_ZONES.map((z) => (
-                      <option key={z} value={z}>
-                        {z}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>District</label>
-                  <input
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Upazila</label>
-                  <input
-                    value={upazila}
-                    onChange={(e) => setUpazila(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Post Office</label>
-                  <input
-                    value={postOffice}
-                    onChange={(e) => setPostOffice(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className={labelClass}>Post Code</label>
-                  <input
-                    value={postCode}
-                    onChange={(e) => setPostCode(e.target.value)}
-                    className={inputClass}
-                    placeholder="4-digit"
-                  />
-                </div>
+
+                {/* Only Dhaka division needs an Inside/Outside choice —
+                    everywhere else is unambiguously outside Dhaka. */}
+                {isDhakaDivision && (
+                  <div className="space-y-1.5">
+                    <label className={labelClass}>Delivery Zone</label>
+                    <select
+                      value={zone}
+                      onChange={(e) => handleZoneChange(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Select zone</option>
+                      {DELIVERY_ZONES.map((z) => (
+                        <option key={z} value={z}>
+                          {z}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {isInsideDhaka ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className={labelClass}>City Corporation</label>
+                      <select
+                        value={cityCorpId}
+                        onChange={(e) => handleCityCorpChange(e.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="">Select city corporation</option>
+                        {cityCorpOptions.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={labelClass}>Thana / Area</label>
+                      <select
+                        value={thanaId}
+                        onChange={(e) => setThanaId(e.target.value)}
+                        className={inputClass}
+                        disabled={!cityCorpId}
+                      >
+                        <option value="">
+                          {cityCorpId
+                            ? "Select thana"
+                            : "Select a city corporation first"}
+                        </option>
+                        {thanaOptions.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className={labelClass}>Post Code</label>
+                      <input
+                        value={postCode}
+                        onChange={(e) => setPostCode(e.target.value)}
+                        className={inputClass}
+                        placeholder="4-digit"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  divisionId &&
+                  (!isDhakaDivision || zone === "Outside Dhaka") && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className={labelClass}>District</label>
+                        <select
+                          value={districtId}
+                          onChange={(e) => handleDistrictChange(e.target.value)}
+                          className={inputClass}
+                        >
+                          <option value="">Select district</option>
+                          {districtOptions.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className={labelClass}>Upazila</label>
+                        <select
+                          value={upazilaId}
+                          onChange={(e) => handleUpazilaChange(e.target.value)}
+                          className={inputClass}
+                          disabled={!districtId}
+                        >
+                          <option value="">
+                            {districtId
+                              ? "Select upazila"
+                              : "Select a district first"}
+                          </option>
+                          {upazilaOptions.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {upazilaId && (
+                        <>
+                          <div className="space-y-1.5">
+                            <label className={labelClass}>Post Office</label>
+                            <select
+                              value={postOfficeId}
+                              onChange={(e) =>
+                                handlePostOfficeChange(e.target.value)
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">Select post office</option>
+                              {postOfficeOptions.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.postOffice}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className={labelClass}>Post Code</label>
+                            <input
+                              value={postCode}
+                              onChange={(e) => setPostCode(e.target.value)}
+                              className={inputClass}
+                              placeholder="Auto-filled from post office"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )
+                )}
+
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className={labelClass}>Area / Street</label>
                   <input

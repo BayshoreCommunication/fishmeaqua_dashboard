@@ -11,6 +11,7 @@ declare module "next-auth" {
     avatar?: string;
     accessToken?: string;
     has_paid_subscription?: boolean;
+    subscription_type?: string;
     googleId?: string;
     role?: string;
     // "admin" when authenticated via the admin-credentials provider
@@ -40,6 +41,7 @@ declare module "next-auth/jwt" {
     avatar?: string;
     accessToken?: string;
     has_paid_subscription?: boolean;
+    subscription_type?: string;
     googleId?: string;
     role?: string;
     userType?: "admin" | "company";

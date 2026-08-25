@@ -1,11 +1,17 @@
 "use client";
 
+import {
+  getCustomerAction,
+  updateCustomerAction,
+  type Customer,
+  type CustomerStatus,
+} from "@/app/actions/customer";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { BiArrowBack } from "react-icons/bi";
-import { BD_DIVISIONS, CustomerStatus, DELIVERY_ZONES, MOCK_CUSTOMERS } from "./mockData";
+import { BD_DIVISIONS, DELIVERY_ZONES } from "./mockData";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10";
@@ -17,24 +23,57 @@ const CustomerEdit = () => {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
 
-  const existing = id ? MOCK_CUSTOMERS.find((c) => c.id === id) : undefined;
-
+  const [existing, setExisting] = useState<Customer | null>(null);
+  const [loading, setLoading] = useState(Boolean(id));
+  const [loadError, setLoadError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const [firstName, setFirstName] = useState(existing?.firstName || "");
-  const [lastName, setLastName] = useState(existing?.lastName || "");
-  const [email, setEmail] = useState(existing?.email || "");
-  const [phone, setPhone] = useState(existing?.phone || "");
-  const [companyName, setCompanyName] = useState(existing?.companyName || "");
-  const [status, setStatus] = useState<CustomerStatus>(existing?.status || "active");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [status, setStatus] = useState<CustomerStatus>("active");
 
-  const [division, setDivision] = useState(existing?.division || "");
-  const [district, setDistrict] = useState(existing?.district || "");
-  const [upazila, setUpazila] = useState(existing?.upazila || "");
-  const [postOffice, setPostOffice] = useState(existing?.postOffice || "");
-  const [postCode, setPostCode] = useState(existing?.postCode || "");
-  const [area, setArea] = useState(existing?.area || "");
-  const [zone, setZone] = useState(existing?.zone || "");
+  const [division, setDivision] = useState("");
+  const [district, setDistrict] = useState("");
+  const [upazila, setUpazila] = useState("");
+  const [postOffice, setPostOffice] = useState("");
+  const [postCode, setPostCode] = useState("");
+  const [area, setArea] = useState("");
+  const [zone, setZone] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      const response = await getCustomerAction(id);
+      if (!response.ok || !response.data) {
+        setLoadError(response.error || "Could not find this customer.");
+        setLoading(false);
+        return;
+      }
+      const customer = response.data;
+      setExisting(customer);
+      setFirstName(customer.firstName);
+      setLastName(customer.lastName);
+      setEmail(customer.email || "");
+      setPhone(customer.phone || "");
+      setCompanyName(customer.companyName || "");
+      setStatus(customer.isActive ? "active" : "inactive");
+      setDivision(customer.address?.division || "");
+      setDistrict(customer.address?.district || "");
+      setUpazila(customer.address?.upazila || "");
+      setPostOffice(customer.address?.postOffice || "");
+      setPostCode(customer.address?.postCode || "");
+      setArea(customer.address?.area || "");
+      setZone(customer.address?.zone || "");
+      setLoading(false);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,21 +87,44 @@ const CustomerEdit = () => {
       return;
     }
 
+    if (!id) return;
     setSubmitting(true);
-    // Design-only — no backend/API call. Simulated save.
-    setTimeout(() => {
-      toast.success("Customer updated");
-      setSubmitting(false);
-      router.push("/customers");
-    }, 400);
+    const response = await updateCustomerAction(id, {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      companyName: companyName.trim(),
+      isActive: status === "active",
+      address: {
+        division: division || undefined,
+        district: district.trim() || undefined,
+        upazila: upazila.trim() || undefined,
+        postOffice: postOffice.trim() || undefined,
+        postCode: postCode.trim() || undefined,
+        area: area.trim() || undefined,
+        zone: (zone || undefined) as "Inside Dhaka" | "Outside Dhaka" | undefined,
+      },
+    });
+    setSubmitting(false);
+    if (!response.ok) {
+      toast.error(response.fieldErrors?.[0] || response.error || "Failed to update customer");
+      return;
+    }
+    toast.success("Customer updated");
+    router.push("/customers");
   };
+
+  if (loading) {
+    return <div className="rounded border border-gray-200 bg-white py-24 text-center text-sm text-gray-500">Loading customer…</div>;
+  }
 
   if (!existing) {
     return (
       <div className="flex flex-col gap-6 bg-gray-50 min-h-screen">
         <div className="rounded border border-gray-200 bg-white py-20 text-center">
           <p className="text-sm text-gray-500">
-            {id ? "Could not find this customer." : "No customer selected."}
+            {loadError || (id ? "Could not find this customer." : "No customer selected.")}
           </p>
           <Link
             href="/customers"
@@ -277,7 +339,7 @@ const CustomerEdit = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Joined</span>
                   <span className="font-medium text-gray-900">
-                    {new Date(existing.joinedAt).toLocaleDateString()}
+                    {new Date(existing.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>

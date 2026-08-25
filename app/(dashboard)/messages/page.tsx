@@ -1,9 +1,9 @@
-import SalesLeadsDetailsView from "@/components/messages/SalesLeadsDetailsView";
+import MessagesList from "@/components/messages/MessagesList";
 
 const page = () => {
   return (
     <div>
-      <SalesLeadsDetailsView />
+      <MessagesList />
     </div>
   );
 };

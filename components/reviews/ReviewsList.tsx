@@ -1,414 +1,456 @@
 "use client";
 
+import {
+  listReviewsAction,
+  moderateReviewAction,
+  type Review,
+  type ReviewFilterStatus,
+  type ReviewListResult,
+  type ReviewStatus,
+} from "@/app/actions/review";
 import Pagination from "@/components/shared/Pagination";
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import {
   BiBox,
   BiCheckCircle,
   BiCommentDetail,
+  BiFile,
+  BiImage,
+  BiLoaderAlt,
   BiSolidStar,
   BiStar,
   BiTimeFive,
-  BiTrash,
   BiXCircle,
 } from "react-icons/bi";
 
 const PAGE_SIZE = 10;
-
-type ReviewStatus = "published" | "pending" | "hidden";
-
-interface Review {
-  id: string;
-  productTitle: string;
-  productImage?: string;
-  customerName: string;
-  rating: number;
-  title: string;
-  comment: string;
-  status: ReviewStatus;
-  createdAt: string;
-}
-
-const REVIEW_STATUSES: ReviewStatus[] = ["published", "pending", "hidden"];
-
-// Design-only placeholder data — no backend/API wiring.
-const MOCK_REVIEWS: Review[] = [
-  {
-    id: "1",
-    productTitle: "API Stress Coat Water Conditioner",
-    customerName: "Rahim Uddin",
-    rating: 5,
-    title: "Works instantly",
-    comment:
-      "Removed the chlorine smell right away and my fish looked comfortable within an hour.",
-    status: "published",
-    createdAt: "2026-08-12T10:00:00.000Z",
-  },
-  {
-    id: "2",
-    productTitle: "Fish Food Pellets 200g",
-    customerName: "Karim Hossain",
-    rating: 4,
-    title: "Good value",
-    comment: "My guppies love it, though the bag could be a bit bigger for the price.",
-    status: "published",
-    createdAt: "2026-08-11T14:30:00.000Z",
-  },
-  {
-    id: "3",
-    productTitle: "Aquarium LED Light Bar",
-    customerName: "Jamal Ahmed",
-    rating: 3,
-    title: "Decent but noisy",
-    comment: "Light quality is nice but the built-in fan has a faint hum at night.",
-    status: "pending",
-    createdAt: "2026-08-10T09:15:00.000Z",
-  },
-  {
-    id: "4",
-    productTitle: "Internal Aquarium Filter 500L/H",
-    customerName: "Nusrat Jahan",
-    rating: 5,
-    title: "Very quiet",
-    comment: "Barely hear it running. Water stayed clear within two days of setup.",
-    status: "published",
-    createdAt: "2026-08-09T18:45:00.000Z",
-  },
-  {
-    id: "5",
-    productTitle: "Aquarium Filter",
-    customerName: "Sabbir Islam",
-    rating: 2,
-    title: "Stopped working after a week",
-    comment: "Motor died after 8 days of use. Waiting on a replacement.",
-    status: "pending",
-    createdAt: "2026-08-08T11:20:00.000Z",
-  },
-  {
-    id: "6",
-    productTitle: "Fish Food Pellets 200g",
-    customerName: "Tania Akter",
-    rating: 5,
-    title: "My bettas love these",
-    comment: "Bought a second bag already. Great texture and color for the fish.",
-    status: "published",
-    createdAt: "2026-08-07T08:00:00.000Z",
-  },
-  {
-    id: "7",
-    productTitle: "Aquarium LED Light Bar",
-    customerName: "Farhan Kabir",
-    rating: 1,
-    title: "Not as described",
-    comment: "Color temperature is way cooler than shown in the photos. Disappointed.",
-    status: "hidden",
-    createdAt: "2026-08-06T16:10:00.000Z",
-  },
-  {
-    id: "8",
-    productTitle: "API Stress Coat Water Conditioner",
-    customerName: "Mitu Rahman",
-    rating: 4,
-    title: "Reliable",
-    comment: "Been using this for months, no issues at all.",
-    status: "published",
-    createdAt: "2026-08-05T13:25:00.000Z",
-  },
-  {
-    id: "9",
-    productTitle: "Internal Aquarium Filter 500L/H",
-    customerName: "Sadia Islam",
-    rating: 3,
-    title: "Average",
-    comment: "Does the job but the intake gets clogged with gravel easily.",
-    status: "pending",
-    createdAt: "2026-08-04T07:40:00.000Z",
-  },
-  {
-    id: "10",
-    productTitle: "Aquarium Filter",
-    customerName: "Hasan Mahmud",
-    rating: 5,
-    title: "Excellent filtration",
-    comment: "Water clarity improved dramatically within the first day.",
-    status: "published",
-    createdAt: "2026-08-03T19:55:00.000Z",
-  },
-  {
-    id: "11",
-    productTitle: "Fish Food Pellets 200g",
-    customerName: "Imran Chowdhury",
-    rating: 4,
-    title: "Fish seem healthier",
-    comment: "Noticed better color on my discus after switching to this food.",
-    status: "published",
-    createdAt: "2026-08-02T12:05:00.000Z",
-  },
-  {
-    id: "12",
-    productTitle: "Aquarium LED Light Bar",
-    customerName: "Ruma Begum",
-    rating: 5,
-    title: "Beautiful glow",
-    comment: "Makes my planted tank look amazing in the evening.",
-    status: "published",
-    createdAt: "2026-08-01T15:30:00.000Z",
-  },
+const FILTERS: { value: ReviewFilterStatus; label: string }[] = [
+  { value: "all", label: "All reviews" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
 ];
 
-function ratingBadgeClass(rating: number) {
-  if (rating >= 4) return "text-amber-500";
-  if (rating === 3) return "text-amber-400";
-  return "text-gray-300";
-}
+const emptySummary: ReviewListResult["summary"] = {
+  total: 0,
+  statusCounts: { pending: 0, approved: 0, rejected: 0 },
+  averageRating: 0,
+};
 
-function reviewStatusBadgeClass(status: ReviewStatus) {
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat("en-BD", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+
+const statusBadgeClass = (status: ReviewStatus) => {
   switch (status) {
-    case "published":
-      return "bg-green-50 text-green-700";
-    case "hidden":
-      return "bg-red-50 text-red-700";
+    case "approved":
+      return "bg-green-50 text-green-700 ring-green-600/10";
+    case "rejected":
+      return "bg-red-50 text-red-700 ring-red-600/10";
     default:
-      return "bg-amber-50 text-amber-700";
+      return "bg-amber-50 text-amber-700 ring-amber-600/10";
   }
-}
+};
 
 const StarRating = ({ rating }: { rating: number }) => (
-  <div className={`flex items-center gap-0.5 ${ratingBadgeClass(rating)}`}>
-    {Array.from({ length: 5 }).map((_, i) =>
-      i < rating ? (
-        <BiSolidStar key={i} size={15} />
+  <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
+    {[1, 2, 3, 4, 5].map((star) =>
+      star <= rating ? (
+        <BiSolidStar key={star} size={16} className="text-amber-400" />
       ) : (
-        <BiStar key={i} size={15} className="text-gray-200" />
+        <BiStar key={star} size={16} className="text-gray-200" />
       ),
     )}
   </div>
 );
 
 const ReviewsList = () => {
-  const [reviews, setReviews] = useState<Review[]>(MOCK_REVIEWS);
+  const [status, setStatus] = useState<ReviewFilterStatus>("all");
   const [page, setPage] = useState(1);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [summary, setSummary] = useState(emptySummary);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [rejectingReview, setRejectingReview] = useState<Review | null>(null);
+  const [rejectionNote, setRejectionNote] = useState("");
 
-  const totalPages = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedReviews = useMemo(
-    () => reviews.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [reviews, currentPage],
-  );
+  const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    const response = await listReviewsAction({ status, page, limit: PAGE_SIZE });
+    if (response.ok && response.data) {
+      setReviews(response.data.reviews);
+      setSummary(response.data.summary);
+      setTotalPages(response.data.pagination.totalPages);
+      if (page > response.data.pagination.totalPages) {
+        setPage(response.data.pagination.totalPages);
+      }
+    } else {
+      setReviews([]);
+      toast.error(response.error || "Failed to load reviews");
+    }
+    setLoading(false);
+  }, [page, status]);
 
-  // Statistics
-  const totalReviews = reviews.length;
-  const publishedReviews = reviews.filter((r) => r.status === "published").length;
-  const pendingReviews = reviews.filter((r) => r.status === "pending").length;
-  const averageRating = reviews.length
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-    : "0.0";
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void fetchReviews();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchReviews]);
+
+  const selectStatus = (nextStatus: ReviewFilterStatus) => {
+    setStatus(nextStatus);
+    setPage(1);
+  };
+
+  const moderate = async (
+    review: Review,
+    nextStatus: "approved" | "rejected",
+    moderationNote?: string,
+  ) => {
+    setUpdatingId(review._id);
+    const response = await moderateReviewAction(review._id, {
+      status: nextStatus,
+      moderationNote: moderationNote?.trim() || undefined,
+    });
+
+    if (response.ok) {
+      toast.success(
+        nextStatus === "approved"
+          ? "Review approved and published"
+          : "Review rejected",
+      );
+      setRejectingReview(null);
+      setRejectionNote("");
+      await fetchReviews();
+    } else {
+      toast.error(response.error || "Failed to update review");
+    }
+    setUpdatingId(null);
+  };
 
   const stats = [
     {
-      title: "Total Reviews",
-      value: totalReviews,
-      subtitle: "All customer reviews",
+      title: "All Reviews",
+      value: summary.total,
+      subtitle: "Verified purchases",
       icon: <BiCommentDetail size={20} />,
-      color: "bg-primary/10",
-      iconColor: "text-primary-dark",
-    },
-    {
-      title: "Published",
-      value: publishedReviews,
-      subtitle: "Visible in the storefront",
-      icon: <BiCheckCircle size={20} />,
-      color: "bg-green-50",
-      iconColor: "text-green-600",
+      color: "bg-primary/10 text-primary-dark",
     },
     {
       title: "Pending",
-      value: pendingReviews,
-      subtitle: "Awaiting moderation",
+      value: summary.statusCounts.pending,
+      subtitle: "Needs your attention",
       icon: <BiTimeFive size={20} />,
-      color: "bg-amber-50",
-      iconColor: "text-amber-600",
+      color: "bg-amber-50 text-amber-600",
+    },
+    {
+      title: "Approved",
+      value: summary.statusCounts.approved,
+      subtitle: "Visible on products",
+      icon: <BiCheckCircle size={20} />,
+      color: "bg-green-50 text-green-600",
     },
     {
       title: "Average Rating",
-      value: `${averageRating} / 5`,
-      subtitle: "Across all reviews",
+      value: `${summary.averageRating.toFixed(1)} / 5`,
+      subtitle: "Across all submissions",
       icon: <BiSolidStar size={20} />,
-      color: "bg-purple-50",
-      iconColor: "text-purple-600",
+      color: "bg-purple-50 text-purple-600",
     },
   ];
-
-  const handleStatusChange = (review: Review, status: ReviewStatus) => {
-    setReviews((prev) =>
-      prev.map((r) => (r.id === review.id ? { ...r, status } : r)),
-    );
-  };
-
-  const handleDelete = (review: Review) => {
-    if (!confirm(`Delete this review by "${review.customerName}"?`)) return;
-    setReviews((prev) => prev.filter((r) => r.id !== review.id));
-  };
+  const filteredTotal =
+    status === "all" ? summary.total : summary.statusCounts[status];
 
   return (
-    <div className="flex flex-col gap-6 bg-gray-50 min-h-screen">
-      {/* Header */}
+    <div className="flex min-h-screen flex-col gap-6 bg-gray-50">
       <div className="rounded border border-gray-200 bg-white p-6">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Reviews</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Moderate and manage customer product reviews
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Product Reviews</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Moderate verified customer reviews before they appear in the store.
+        </p>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
           <div
-            key={index}
-            className="rounded border border-gray-200 bg-white p-5 hover:shadow-sm transition-shadow"
+            key={stat.title}
+            className="rounded border border-gray-200 bg-white p-5 transition-shadow hover:shadow-sm"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}
-              >
-                <span className={stat.iconColor}>{stat.icon}</span>
-              </div>
-              <h3 className="text-sm font-medium text-gray-700">
-                {stat.title}
-              </h3>
+            <div className="mb-3 flex items-center gap-3">
+              <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}>
+                {stat.icon}
+              </span>
+              <h2 className="text-sm font-medium text-gray-700">{stat.title}</h2>
             </div>
-            <p className="mb-1 text-3xl font-bold text-gray-900">
-              {stat.value}
-            </p>
+            <p className="mb-1 text-3xl font-bold text-gray-900">{stat.value}</p>
             <p className="text-xs text-gray-500">{stat.subtitle}</p>
           </div>
         ))}
       </div>
 
-      {/* Reviews Table */}
-      <div className="rounded border border-gray-200 bg-white overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Product
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Rating
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Review
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedReviews.map((review) => (
-                <tr key={review.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
-                        <BiBox size={18} />
-                      </div>
-                      <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
-                        {review.productTitle}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm text-gray-700 truncate max-w-[140px]">
-                      {review.customerName}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <StarRating rating={review.rating} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="min-w-0 max-w-xs">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {review.title}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {review.comment}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={review.status}
-                      onChange={(e) =>
-                        handleStatusChange(review, e.target.value as ReviewStatus)
-                      }
-                      className={`rounded-full border-0 px-3 py-1 text-xs font-medium capitalize focus:outline-none focus:ring-2 focus:ring-primary/20 ${reviewStatusBadgeClass(review.status)}`}
-                    >
-                      {REVIEW_STATUSES.map((status) => (
-                        <option key={status} value={status} className="capitalize">
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <button
-                      onClick={() => handleDelete(review)}
-                      className="text-red-500 hover:text-red-700 transition-colors p-1"
-                      title="Delete review"
-                    >
-                      <BiTrash size={18} />
-                    </button>
-                  </td>
-                </tr>
+      <section className="overflow-hidden rounded border border-gray-200 bg-white">
+        <div className="flex flex-col justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center">
+          <label className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-gray-700">Filter by status</span>
+            <select
+              value={status}
+              onChange={(event) =>
+                selectStatus(event.target.value as ReviewFilterStatus)
+              }
+              disabled={loading}
+              className="h-10 min-w-48 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50"
+            >
+              {FILTERS.map((filter) => (
+                <option key={filter.value} value={filter.value}>
+                  {filter.label} ({filter.value === "all" ? summary.total : summary.statusCounts[filter.value]})
+                </option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </label>
+          <p className="text-xs text-gray-500">
+            Showing {reviews.length} of {filteredTotal} {status === "all" ? "reviews" : `${status} reviews`}
+          </p>
         </div>
 
-        {/* Empty State */}
-        {reviews.length === 0 && (
-          <div className="text-center py-20 bg-white">
-            <div className="mx-auto w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-              <BiXCircle size={32} className="text-gray-300" />
+        {loading ? (
+          <div className="flex min-h-72 items-center justify-center">
+            <div className="text-center text-gray-500">
+              <BiLoaderAlt className="mx-auto animate-spin text-primary" size={30} />
+              <p className="mt-3 text-sm">Loading real review data…</p>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">
-              No reviews yet
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="py-20 text-center">
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-50">
+              <BiXCircle size={32} className="text-gray-300" />
+            </span>
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">
+              {status === "all" ? "No reviews yet" : `No ${status} reviews`}
             </h3>
-            <p className="text-gray-500 text-sm max-w-xs mx-auto">
-              Reviews left by customers will appear here.
+            <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500">
+              Customer reviews with this moderation status will appear here.
             </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px]">
+              <thead className="border-b border-gray-200 bg-gray-50">
+                <tr>
+                  {["Product", "Customer & order", "Rating", "Review", "Attachments", "Status / action"].map(
+                    (heading) => (
+                      <th
+                        key={heading}
+                        className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
+                      >
+                        {heading}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {reviews.map((review) => {
+                  const customerName = review.customer
+                    ? `${review.customer.firstName} ${review.customer.lastName}`.trim()
+                    : "Deleted customer";
+                  const isUpdating = updatingId === review._id;
+
+                  return (
+                    <tr key={review._id} className="align-top transition hover:bg-gray-50/70">
+                      <td className="px-5 py-5">
+                        <div className="flex items-center gap-3">
+                          {review.product?.featureImage ? (
+                            <Image
+                              src={review.product.featureImage}
+                              alt=""
+                              width={44}
+                              height={44}
+                              className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
+                              <BiBox size={19} />
+                            </span>
+                          )}
+                          <div className="min-w-0 max-w-48">
+                            <p className="truncate text-sm font-semibold text-gray-900">
+                              {review.product?.title ?? "Deleted product"}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              SKU: {review.product?.sku ?? "—"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-5">
+                        <p className="text-sm font-medium text-gray-800">{customerName}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {review.customer?.email || review.customer?.phone || "No contact"}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-primary-dark">
+                          #{review.order?.orderNumber ?? "Deleted order"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <StarRating rating={review.rating} />
+                        <p className="mt-1 text-xs font-semibold text-gray-500">
+                          {review.rating}.0 / 5
+                        </p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <p className="max-w-xs whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                          {review.comment}
+                        </p>
+                        {review.moderationNote && (
+                          <p className="mt-2 max-w-xs rounded bg-gray-50 px-2.5 py-2 text-xs text-gray-500">
+                            <span className="font-semibold text-gray-700">Staff note:</span>{" "}
+                            {review.moderationNote}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-5 py-5">
+                        {review.attachments.length === 0 ? (
+                          <span className="text-xs text-gray-400">No files</span>
+                        ) : (
+                          <div className="flex max-w-48 flex-col gap-1.5">
+                            {review.attachments.map((attachment) => (
+                              <a
+                                key={attachment.url}
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-2 rounded-md border border-gray-200 px-2.5 py-2 text-xs font-medium text-gray-600 transition hover:border-primary/30 hover:text-primary-dark"
+                              >
+                                {attachment.type === "image" ? (
+                                  <BiImage className="shrink-0" size={15} />
+                                ) : (
+                                  <BiFile className="shrink-0" size={15} />
+                                )}
+                                <span className="truncate">{attachment.name}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-5 py-5">
+                        <div className="relative w-fit">
+                          <select
+                            value={review.status}
+                            disabled={isUpdating}
+                            aria-label={`Change status for review by ${customerName}`}
+                            onChange={(event) => {
+                              const nextStatus = event.target.value as ReviewStatus;
+                              if (nextStatus === review.status) return;
+                              if (nextStatus === "rejected") {
+                                setRejectingReview(review);
+                                setRejectionNote("");
+                                return;
+                              }
+                              void moderate(review, "approved");
+                            }}
+                            className={`min-w-32 cursor-pointer appearance-none rounded-full border-0 py-2 pl-3 pr-8 text-xs font-semibold capitalize outline-none ring-1 ring-inset transition focus:ring-2 focus:ring-primary/25 disabled:cursor-wait disabled:opacity-60 ${statusBadgeClass(review.status)}`}
+                          >
+                            <option
+                              value="pending"
+                              disabled={review.status !== "pending"}
+                            >
+                              Pending
+                            </option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                          {isUpdating && (
+                            <BiLoaderAlt className="pointer-events-none absolute right-2.5 top-2.5 animate-spin" size={14} />
+                          )}
+                        </div>
+                        <p className="mt-2 max-w-32 text-xs leading-5 text-gray-400">
+                          {formatDate(review.createdAt)}
+                        </p>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {reviews.length > 0 && totalPages > 1 && (
-          <div className="border-t border-gray-200 px-6 py-4">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
+        {!loading && reviews.length > 0 && totalPages > 1 && (
+          <div className="border-t border-gray-200 px-5 py-4">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
         )}
-      </div>
+      </section>
+
+      {rejectingReview && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-review-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !updatingId) {
+              setRejectingReview(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <BiXCircle size={24} />
+            </span>
+            <h2 id="reject-review-title" className="mt-4 text-xl font-bold text-gray-900">
+              Reject this review?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-500">
+              It will not appear on the product page. Add an internal note explaining the decision.
+            </p>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-sm font-semibold text-gray-700">
+                Moderation note <span className="font-normal text-gray-400">(optional)</span>
+              </span>
+              <textarea
+                value={rejectionNote}
+                onChange={(event) => setRejectionNote(event.target.value)}
+                maxLength={500}
+                rows={4}
+                placeholder="For example: Contains unrelated or inappropriate content"
+                className="w-full resize-none rounded-lg border border-gray-200 px-3.5 py-3 text-sm text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+              />
+              <span className="mt-1 block text-right text-xs text-gray-400">
+                {rejectionNote.length}/500
+              </span>
+            </label>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={Boolean(updatingId)}
+                onClick={() => setRejectingReview(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(updatingId)}
+                onClick={() => moderate(rejectingReview, "rejected", rejectionNote)}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {updatingId ? <BiLoaderAlt className="animate-spin" /> : <BiXCircle />}
+                Reject review
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

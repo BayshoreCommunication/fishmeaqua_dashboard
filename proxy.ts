@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { auth } from "./auth";
-import { fetchUserProfile } from "./lib/fetchUserProfile";
 import { fetchAdminProfile } from "./lib/fetchAdminProfile";
+
+const STAFF_ROLES = new Set(["manager", "admin", "superadmin"]);
 
 // Static assets + NextAuth's own session/csrf/callback plumbing — never gated,
 // or sign-in itself breaks.
@@ -24,21 +25,25 @@ export async function proxy(request: NextRequest) {
   try {
     const session = await auth();
     const sessionUser = session?.user as
-      | { accessToken?: string; userType?: "admin" | "company" }
+      | {
+          accessToken?: string;
+          role?: string;
+          userType?: "admin" | "company";
+        }
       | undefined;
     const token = sessionUser?.accessToken;
-    const isAdminSession = sessionUser?.userType === "admin";
+    const isStaffSession =
+      sessionUser?.userType === "admin" &&
+      typeof sessionUser.role === "string" &&
+      STAFF_ROLES.has(sessionUser.role);
 
     // A session is only "live" if its backend account is still active.
-    // /api/user (company) and /api/v1/admin/me (staff) both filter
-    // is_active=true server-side, so a null result means the account is
-    // gone/deactivated — treated the same as not signed in.
+    // The backend profile check also catches expired tokens and accounts that
+    // were removed or deactivated after their dashboard session was created.
     let isActiveSession = false;
-    if (sessionUser && token) {
-      const profile = isAdminSession
-        ? await fetchAdminProfile(token)
-        : await fetchUserProfile(token);
-      isActiveSession = Boolean(profile);
+    if (isStaffSession && token) {
+      const profile = await fetchAdminProfile(token);
+      isActiveSession = Boolean(profile && STAFF_ROLES.has(profile.role));
     }
 
     // Root path: route based on auth state only.
@@ -53,7 +58,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
-    // Everything else is open, signed in or not.
+    // Dashboard pages are staff-only. Customer sessions and missing, expired,
+    // or deactivated staff sessions all return to the staff sign-in page.
+    if (!isActiveSession && pathname !== "/sign-in") {
+      const signInUrl = new URL("/sign-in", request.url);
+      signInUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+
     return NextResponse.next();
   } catch (error) {
     // A thrown error here (e.g. a corrupted/expired session cookie) would
@@ -61,8 +73,12 @@ export async function proxy(request: NextRequest) {
     // Error" — fall back to treating the visitor as unauthenticated
     // instead of taking the whole site down.
     console.error("💥 [Proxy] Unexpected error:", error);
-    if (pathname === "/") {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
+    if (pathname !== "/sign-in") {
+      const signInUrl = new URL("/sign-in", request.url);
+      if (pathname !== "/") {
+        signInUrl.searchParams.set("callbackUrl", pathname);
+      }
+      return NextResponse.redirect(signInUrl);
     }
     return NextResponse.next();
   }

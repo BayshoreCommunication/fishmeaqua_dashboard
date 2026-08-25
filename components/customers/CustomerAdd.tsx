@@ -1,11 +1,15 @@
 "use client";
 
+import {
+  createCustomerAction,
+  type CustomerStatus,
+} from "@/app/actions/customer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { BiArrowBack } from "react-icons/bi";
-import { BD_DIVISIONS, CustomerStatus, DELIVERY_ZONES } from "./mockData";
+import { BD_DIVISIONS, DELIVERY_ZONES } from "./mockData";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10";
@@ -21,6 +25,7 @@ const CustomerAdd = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<CustomerStatus>("active");
 
   const [division, setDivision] = useState("");
@@ -43,13 +48,37 @@ const CustomerAdd = () => {
       return;
     }
 
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
     setSubmitting(true);
-    // Design-only — no backend/API call. Simulated save.
-    setTimeout(() => {
-      toast.success("Customer created");
-      setSubmitting(false);
-      router.push("/customers");
-    }, 400);
+    const response = await createCustomerAction({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
+      companyName: companyName.trim() || undefined,
+      password,
+      isActive: status === "active",
+      address: {
+        division: division || undefined,
+        district: district.trim() || undefined,
+        upazila: upazila.trim() || undefined,
+        postOffice: postOffice.trim() || undefined,
+        postCode: postCode.trim() || undefined,
+        area: area.trim() || undefined,
+        zone: (zone || undefined) as "Inside Dhaka" | "Outside Dhaka" | undefined,
+      },
+    });
+    setSubmitting(false);
+    if (!response.ok) {
+      toast.error(response.fieldErrors?.[0] || response.error || "Failed to create customer");
+      return;
+    }
+    toast.success("Customer created");
+    router.push("/customers");
   };
 
   return (
@@ -130,6 +159,24 @@ const CustomerAdd = () => {
                     className={inputClass}
                     placeholder="Optional"
                   />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className={labelClass}>
+                    Temporary Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={inputClass}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Share this securely with the customer so they can sign in.
+                  </p>
                 </div>
               </div>
             </div>

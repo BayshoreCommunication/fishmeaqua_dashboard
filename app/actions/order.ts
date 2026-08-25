@@ -194,11 +194,20 @@ export async function createOrderAction(data: {
   }
 }
 
-// ── Update order status / payment status / notes ─────────────────────────────────
+// ── Update an order (status/payment/notes, or customer info + address) ───────────
 
 export async function updateOrderAction(
   id: string,
-  data: { orderStatus?: OrderStatus; paymentStatus?: PaymentStatus; notes?: string },
+  data: {
+    orderStatus?: OrderStatus;
+    paymentStatus?: PaymentStatus;
+    notes?: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    shippingAddress?: OrderAddress;
+    items?: { product: string; quantity: number }[];
+  },
 ): Promise<OrderDataResponse<Order>> {
   const token = await getAuthToken();
   if (!token) return { ok: false, error: "Not authenticated." };

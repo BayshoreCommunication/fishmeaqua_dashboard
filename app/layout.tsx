@@ -25,7 +25,6 @@ const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   "https://fishmeaqua-dashboard.vercel.app"
 ).replace(/\/+$/, "");
-const OPEN_GRAPH_IMAGE_URL = new URL("/opengraph-image.png", SITE_URL).toString();
 const META_TITLE = "Fish Me Aqua Dashboard";
 const META_DESCRIPTION =
   "Secure staff dashboard for managing Fish Me Aqua products, orders, customers, reviews, messages, and commerce analytics.";
@@ -53,7 +52,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: [
       {
-        url: OPEN_GRAPH_IMAGE_URL,
+        url: "/opengraph-image.png",
         width: 2400,
         height: 1260,
         alt: "Fish Me Aqua Dashboard",
@@ -65,7 +64,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: META_TITLE,
     description: META_DESCRIPTION,
-    images: [OPEN_GRAPH_IMAGE_URL],
+    images: ["/opengraph-image.png"],
   },
   robots: {
     index: false,

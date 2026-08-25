@@ -2,10 +2,12 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com";
+  process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app";
 const AUTH_SECRET =
   process.env.DASHBOARD_AUTH_SECRET ??
-  (process.env.AUTH_SECRET ? `dashboard:${process.env.AUTH_SECRET}` : undefined);
+  (process.env.AUTH_SECRET
+    ? `dashboard:${process.env.AUTH_SECRET}`
+    : undefined);
 
 const STAFF_ROLES = new Set(["manager", "admin", "superadmin"]);
 
@@ -106,8 +108,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         token.accessToken = user.accessToken;
         token.role = user.role;
         token.companyName = user.companyName;
-        token.has_paid_subscription =
-          user.has_paid_subscription ?? false;
+        token.has_paid_subscription = user.has_paid_subscription ?? false;
         token.subscription_type = user.subscription_type ?? "free";
         token.userType = "admin";
       }

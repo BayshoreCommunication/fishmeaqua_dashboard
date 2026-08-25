@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app";
 
 export interface AdminProfile {
   id: string;
@@ -12,7 +13,9 @@ export interface AdminProfile {
 // longer exists (see backend's `protect` middleware) — a null return here
 // means "no longer a valid session," same signal as fetchUserProfile
 // returning null for a deactivated company account.
-export async function fetchAdminProfile(token: string): Promise<AdminProfile | null> {
+export async function fetchAdminProfile(
+  token: string,
+): Promise<AdminProfile | null> {
   try {
     const res = await fetch(`${API_URL}/api/v1/users/me`, {
       method: "GET",

@@ -2,7 +2,7 @@
 
 import { auth, signIn, signOut } from "@/auth";
 
-const API = `${process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com"}/api/v1`;
+const API = `${process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app"}/api/v1`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,10 @@ async function getAdminAuthToken() {
   return (session?.user as any)?.accessToken as string | undefined;
 }
 
-async function parseAdminError(res: Response, fallback: string): Promise<string> {
+async function parseAdminError(
+  res: Response,
+  fallback: string,
+): Promise<string> {
   try {
     const body = await res.json();
     if (typeof body?.message === "string") return body.message;
@@ -90,7 +93,9 @@ async function parseAdminError(res: Response, fallback: string): Promise<string>
   return fallback;
 }
 
-export async function getMyAdminProfileAction(): Promise<AdminDataResponse<AdminAccount>> {
+export async function getMyAdminProfileAction(): Promise<
+  AdminDataResponse<AdminAccount>
+> {
   const token = await getAdminAuthToken();
   if (!token) return { ok: false, error: "Not authenticated." };
 
@@ -101,7 +106,10 @@ export async function getMyAdminProfileAction(): Promise<AdminDataResponse<Admin
       cache: "no-store",
     });
     if (!res.ok) {
-      return { ok: false, error: await parseAdminError(res, "Failed to fetch profile.") };
+      return {
+        ok: false,
+        error: await parseAdminError(res, "Failed to fetch profile."),
+      };
     }
     const body = await res.json();
     return { ok: true, data: body.data as AdminAccount };
@@ -109,4 +117,3 @@ export async function getMyAdminProfileAction(): Promise<AdminDataResponse<Admin
     return { ok: false, error: "Network error. Please try again." };
   }
 }
-

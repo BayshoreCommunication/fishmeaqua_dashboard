@@ -64,11 +64,14 @@ interface UserDataResponse<T = unknown> {
 
 async function getAuthContext() {
   const session = await auth();
-  const token = (session?.user as { accessToken?: string } | undefined)?.accessToken;
+  const token = (session?.user as { accessToken?: string } | undefined)
+    ?.accessToken;
   const userId = session?.user?.id;
 
   return {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com",
+    apiUrl:
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://fishmeaqua-backend.vercel.app",
     token,
     userId,
   };
@@ -81,7 +84,10 @@ function authHeader(token: string): HeadersInit {
   };
 }
 
-async function parseError(response: Response, fallback: string): Promise<string> {
+async function parseError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
   try {
     const body = await response.json();
     if (typeof body?.detail === "string") return body.detail;
@@ -134,7 +140,9 @@ export async function getUserData(): Promise<UserDataResponse<UserProfile>> {
   }
 }
 
-export async function getCurrentUserDetails(): Promise<UserDataResponse<UserFull>> {
+export async function getCurrentUserDetails(): Promise<
+  UserDataResponse<UserFull>
+> {
   const { apiUrl, token, userId } = await getAuthContext();
 
   if (!token || !userId) {
@@ -175,7 +183,9 @@ export async function getCurrentUserDetails(): Promise<UserDataResponse<UserFull
   }
 }
 
-export async function getUserById(id: string): Promise<UserDataResponse<UserFull>> {
+export async function getUserById(
+  id: string,
+): Promise<UserDataResponse<UserFull>> {
   const { apiUrl, token } = await getAuthContext();
 
   if (!token) {
@@ -264,7 +274,7 @@ export async function updateUserData(updateData: {
 
 export async function getAllUserData(
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
 ): Promise<UserDataResponse<UserListPayload>> {
   const { apiUrl, token } = await getAuthContext();
 
@@ -311,7 +321,9 @@ export async function getAllUserData(
   }
 }
 
-export async function userDeletedById(id: string): Promise<UserDataResponse<null>> {
+export async function userDeletedById(
+  id: string,
+): Promise<UserDataResponse<null>> {
   const { apiUrl, token } = await getAuthContext();
 
   if (!token) {
@@ -357,16 +369,20 @@ export async function userSubscriptionByIds(
   search: string = "52",
   page: number = 1,
   limit: number = 5,
-  searchOption: string = "all"
+  searchOption: string = "all",
 ): Promise<UserDataResponse> {
   const session = await auth();
 
-  if (!session?.user || !(session.user as { accessToken?: string }).accessToken) {
+  if (
+    !session?.user ||
+    !(session.user as { accessToken?: string }).accessToken
+  ) {
     return { error: "User is not authenticated.", ok: false, data: null };
   }
 
   try {
-    const token = (session.user as { accessToken?: string }).accessToken as string;
+    const token = (session.user as { accessToken?: string })
+      .accessToken as string;
     const queryParams = new URLSearchParams({
       search,
       page: page.toString(),
@@ -375,14 +391,14 @@ export async function userSubscriptionByIds(
     });
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com"}/api/subscription/${userId}?${queryParams}`,
+      `${process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app"}/api/subscription/${userId}?${queryParams}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -409,16 +425,20 @@ export async function userSubscriptionById(
   userId: string,
   search: string = "",
   page: number = 1,
-  limit: number = 10000
+  limit: number = 10000,
 ): Promise<UserDataResponse> {
   const session = await auth();
 
-  if (!session?.user || !(session.user as { accessToken?: string }).accessToken) {
+  if (
+    !session?.user ||
+    !(session.user as { accessToken?: string }).accessToken
+  ) {
     return { error: "User is not authenticated.", ok: false, data: null };
   }
 
   try {
-    const token = (session.user as { accessToken?: string }).accessToken as string;
+    const token = (session.user as { accessToken?: string })
+      .accessToken as string;
     const queryParams = new URLSearchParams({
       search,
       page: page.toString(),
@@ -426,7 +446,7 @@ export async function userSubscriptionById(
     }).toString();
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com"}/api/subscription/${userId}?${queryParams}`,
+      `${process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app"}/api/subscription/${userId}?${queryParams}`,
       {
         method: "GET",
         headers: {
@@ -434,7 +454,7 @@ export async function userSubscriptionById(
           Authorization: `Bearer ${token}`,
         },
         next: { tags: ["subscriptions_list"] },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -457,13 +477,18 @@ export async function userSubscriptionById(
   }
 }
 
-export async function getUserDataTest(headers: HeadersInit): Promise<UserDataResponse<UserProfile>> {
+export async function getUserDataTest(
+  headers: HeadersInit,
+): Promise<UserDataResponse<UserProfile>> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://api.bayshorecommunication.com"}/api/user`, {
-      method: "GET",
-      headers,
-      next: { tags: ["user_profile"], revalidate: 360 },
-    });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "https://fishmeaqua-backend.vercel.app"}/api/user`,
+      {
+        method: "GET",
+        headers,
+        next: { tags: ["user_profile"], revalidate: 360 },
+      },
+    );
 
     if (!response.ok) {
       return {
@@ -492,11 +517,11 @@ export async function getUserDataTest(headers: HeadersInit): Promise<UserDataRes
 export const getCachedAllUsersData = unstable_cache(
   async (page: number, pageSize: number) => getAllUserData(page, pageSize),
   ["users_list_cache"],
-  { revalidate: 120 }
+  { revalidate: 120 },
 );
 
 export const getCachedUserProfileData = unstable_cache(
   async (headers: HeadersInit) => getUserDataTest(headers),
   ["user_profile_cache"],
-  { revalidate: 360 }
+  { revalidate: 360 },
 );

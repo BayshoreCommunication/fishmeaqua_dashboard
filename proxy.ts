@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { auth } from "./auth";
-import { fetchAdminProfile } from "./lib/fetchAdminProfile";
 
 const STAFF_ROLES = new Set(["manager", "admin", "superadmin"]);
 
@@ -18,7 +17,10 @@ const EXCLUDED_PATHS = [
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (EXCLUDED_PATHS.some((path) => pathname.startsWith(path))) {
+  if (
+    EXCLUDED_PATHS.some((path) => pathname.startsWith(path)) ||
+    /\/[^/]+\.[a-z0-9]+$/i.test(pathname)
+  ) {
     return NextResponse.next();
   }
 
@@ -37,14 +39,10 @@ export async function proxy(request: NextRequest) {
       typeof sessionUser.role === "string" &&
       STAFF_ROLES.has(sessionUser.role);
 
-    // A session is only "live" if its backend account is still active.
-    // The backend profile check also catches expired tokens and accounts that
-    // were removed or deactivated after their dashboard session was created.
-    let isActiveSession = false;
-    if (isStaffSession && token) {
-      const profile = await fetchAdminProfile(token);
-      isActiveSession = Boolean(profile && STAFF_ROLES.has(profile.role));
-    }
+    // Auth.js validates this signed dashboard-only session locally. Protected
+    // backend actions validate the JWT and account status again before data is
+    // returned, avoiding a blocking API round trip on every page navigation.
+    const isActiveSession = Boolean(isStaffSession && token);
 
     // Root path: route based on auth state only.
     if (pathname === "/") {

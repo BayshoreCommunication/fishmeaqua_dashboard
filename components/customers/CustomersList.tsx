@@ -39,6 +39,51 @@ const currency = (value: number) =>
 const initials = (customer: Customer) =>
   `${customer.firstName.charAt(0)}${customer.lastName.charAt(0)}`.toUpperCase();
 
+const CustomerStatsSkeleton = () => (
+  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4" aria-hidden="true">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div key={index} className="animate-pulse rounded border border-gray-200 bg-white p-5">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="h-10 w-10 rounded-lg bg-gray-200" />
+          <span className="h-4 w-28 rounded bg-gray-200" />
+        </div>
+        <span className="block h-8 w-24 rounded bg-gray-200" />
+        <span className="mt-2 block h-3 w-36 rounded bg-gray-100" />
+      </div>
+    ))}
+  </div>
+);
+
+const CustomerTableSkeleton = () => (
+  <div className="overflow-x-auto" role="status" aria-label="Loading customers" aria-busy="true">
+    <table className="w-full min-w-[1050px]">
+      <thead className="border-b border-gray-200 bg-gray-50">
+        <tr>
+          {["Customer", "Contact", "Location", "Orders", "Total spent", "Status", "Joined", "Action"].map((heading) => (
+            <th key={heading} className={`px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 ${heading === "Action" ? "text-right" : ""}`}>
+              {heading}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200">
+        {Array.from({ length: 6 }).map((_, row) => (
+          <tr key={row} className="animate-pulse">
+            <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="h-9 w-9 rounded-full bg-gray-200" /><div className="space-y-2"><span className="block h-3.5 w-28 rounded bg-gray-200" /><span className="block h-3 w-20 rounded bg-gray-100" /></div></div></td>
+            <td className="px-5 py-4"><div className="space-y-2"><span className="block h-3.5 w-36 rounded bg-gray-200" /><span className="block h-3 w-24 rounded bg-gray-100" /></div></td>
+            <td className="px-5 py-4"><div className="space-y-2"><span className="block h-3.5 w-24 rounded bg-gray-200" /><span className="block h-3 w-20 rounded bg-gray-100" /></div></td>
+            <td className="px-5 py-4"><span className="block h-4 w-8 rounded bg-gray-200" /></td>
+            <td className="px-5 py-4"><span className="block h-4 w-20 rounded bg-gray-200" /></td>
+            <td className="px-5 py-4"><span className="block h-7 w-20 rounded-full bg-gray-200" /></td>
+            <td className="px-5 py-4"><span className="block h-4 w-24 rounded bg-gray-200" /></td>
+            <td className="px-5 py-4"><div className="ml-auto flex w-fit gap-3"><span className="h-5 w-5 rounded bg-gray-200" /><span className="h-5 w-5 rounded bg-gray-200" /><span className="h-5 w-5 rounded bg-gray-200" /></div></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 const CustomersList = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [summary, setSummary] = useState(emptySummary);
@@ -130,7 +175,7 @@ const CustomersList = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {loading ? <CustomerStatsSkeleton /> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.title} className="rounded border border-gray-200 bg-white p-5 transition-shadow hover:shadow-sm">
             <div className="mb-3 flex items-center gap-3">
@@ -143,7 +188,7 @@ const CustomersList = () => {
             <p className="text-xs text-gray-500">{stat.subtitle}</p>
           </div>
         ))}
-      </div>
+      </div>}
 
       <section className="overflow-hidden rounded border border-gray-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-gray-200 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -159,7 +204,7 @@ const CustomersList = () => {
         </div>
 
         {loading ? (
-          <div className="flex min-h-72 items-center justify-center text-gray-500"><BiLoaderAlt className="mr-2 animate-spin text-primary" size={25} /> Loading customers…</div>
+          <CustomerTableSkeleton />
         ) : customers.length === 0 ? (
           <div className="py-20 text-center"><BiUser size={32} className="mx-auto text-gray-300" /><h3 className="mt-4 text-lg font-medium text-gray-900">No customers found</h3><p className="mt-1 text-sm text-gray-500">Try changing your search or status filter.</p></div>
         ) : (

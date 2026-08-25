@@ -71,6 +71,49 @@ const StarRating = ({ rating }: { rating: number }) => (
   </div>
 );
 
+const ReviewStatsSkeleton = () => (
+  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div key={index} className="animate-pulse rounded border border-gray-200 bg-white p-5">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="h-10 w-10 rounded-lg bg-gray-200" />
+          <span className="h-4 w-28 rounded bg-gray-200" />
+        </div>
+        <span className="block h-8 w-24 rounded bg-gray-200" />
+        <span className="mt-2 block h-3 w-36 rounded bg-gray-100" />
+      </div>
+    ))}
+  </div>
+);
+
+const ReviewTableSkeleton = () => (
+  <div className="overflow-x-auto" role="status" aria-label="Loading reviews" aria-busy="true">
+    <table className="w-full min-w-[1100px]">
+      <thead className="border-b border-gray-200 bg-gray-50">
+        <tr>
+          {["Product", "Customer & order", "Rating", "Review", "Attachments", "Status / action"].map((heading) => (
+            <th key={heading} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
+              {heading}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200 bg-white">
+        {Array.from({ length: 6 }).map((_, row) => (
+          <tr key={row} className="animate-pulse align-top">
+            <td className="px-5 py-5"><div className="flex items-center gap-3"><span className="h-11 w-11 rounded-lg bg-gray-200" /><div className="space-y-2"><span className="block h-3.5 w-32 rounded bg-gray-200" /><span className="block h-3 w-20 rounded bg-gray-100" /></div></div></td>
+            <td className="px-5 py-5"><div className="space-y-2"><span className="block h-3.5 w-32 rounded bg-gray-200" /><span className="block h-3 w-40 rounded bg-gray-100" /><span className="block h-3 w-24 rounded bg-gray-100" /></div></td>
+            <td className="px-5 py-5"><span className="block h-4 w-24 rounded bg-gray-200" /><span className="mt-2 block h-3 w-14 rounded bg-gray-100" /></td>
+            <td className="px-5 py-5"><div className="space-y-2"><span className="block h-3.5 w-56 rounded bg-gray-200" /><span className="block h-3.5 w-44 rounded bg-gray-100" /><span className="block h-3.5 w-48 rounded bg-gray-100" /></div></td>
+            <td className="px-5 py-5"><span className="block h-9 w-28 rounded-md bg-gray-200" /></td>
+            <td className="px-5 py-5"><span className="block h-8 w-32 rounded-full bg-gray-200" /><span className="mt-2 block h-3 w-24 rounded bg-gray-100" /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 const ReviewsList = () => {
   const [status, setStatus] = useState<ReviewFilterStatus>("all");
   const [page, setPage] = useState(1);
@@ -179,7 +222,7 @@ const ReviewsList = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      {loading ? <ReviewStatsSkeleton /> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <div
             key={stat.title}
@@ -195,7 +238,7 @@ const ReviewsList = () => {
             <p className="text-xs text-gray-500">{stat.subtitle}</p>
           </div>
         ))}
-      </div>
+      </div>}
 
       <section className="overflow-hidden rounded border border-gray-200 bg-white">
         <div className="flex flex-col justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center">
@@ -222,12 +265,7 @@ const ReviewsList = () => {
         </div>
 
         {loading ? (
-          <div className="flex min-h-72 items-center justify-center">
-            <div className="text-center text-gray-500">
-              <BiLoaderAlt className="mx-auto animate-spin text-primary" size={30} />
-              <p className="mt-3 text-sm">Loading real review data…</p>
-            </div>
-          </div>
+          <ReviewTableSkeleton />
         ) : reviews.length === 0 ? (
           <div className="py-20 text-center">
             <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-50">

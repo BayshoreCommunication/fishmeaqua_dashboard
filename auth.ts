@@ -61,6 +61,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
               password: credentials.password,
             }),
             cache: "no-store",
+            signal: AbortSignal.timeout(5000),
           });
 
           if (!res.ok) {

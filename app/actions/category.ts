@@ -19,6 +19,41 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface CategoryParentRef {
+  _id: string;
+  name: string;
+  slug: string;
+}
+
+// A row of the paginated list — the parent comes populated so its name is
+// available even when it sits on another page.
+export interface CategoryListItem extends Omit<Category, "parent"> {
+  parent?: CategoryParentRef | null;
+  productCount: number;
+}
+
+export interface CategoryPageResult {
+  categories: CategoryListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CategoryPageParams {
+  page: number;
+  limit?: number;
+  search?: string;
+  isActive?: boolean;
+}
+
+export interface CategoryStats {
+  total: number;
+  active: number;
+  inactive: number;
+  subcategories: number;
+}
+
 interface CategoryDataResponse<T = unknown> {
   ok: boolean;
   data?: T | null;
@@ -58,6 +93,64 @@ export async function listCategoriesAction(): Promise<
     });
     if (!res.ok) {
       const { message } = await parseError(res, "Failed to fetch categories.");
+      return { ok: false, error: message };
+    }
+    const body = await res.json();
+    return { ok: true, data: body.data };
+  } catch {
+    return { ok: false, error: "Network error. Please try again." };
+  }
+}
+
+// ── List one page of categories (public) ──────────────────────────────────────
+// Passing `page` switches the backend to its paginated response; the plain
+// listCategoriesAction above still returns every category for dropdowns.
+
+export async function listCategoriesPageAction(
+  params: CategoryPageParams,
+): Promise<CategoryDataResponse<CategoryPageResult>> {
+  try {
+    const query = new URLSearchParams({ page: String(params.page) });
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.search) query.set("search", params.search);
+    if (params.isActive !== undefined) {
+      query.set("isActive", String(params.isActive));
+    }
+
+    const res = await fetch(`${API}/categories?${query.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const { message } = await parseError(res, "Failed to fetch categories.");
+      return { ok: false, error: message };
+    }
+    const body = await res.json();
+    return { ok: true, data: body.data };
+  } catch {
+    return { ok: false, error: "Network error. Please try again." };
+  }
+}
+
+// ── Category counts (manager/admin/superadmin only) ───────────────────────────
+
+export async function getCategoryStatsAction(): Promise<
+  CategoryDataResponse<CategoryStats>
+> {
+  const token = await getAuthToken();
+  if (!token) return { ok: false, error: "Not authenticated." };
+
+  try {
+    const res = await fetch(`${API}/categories/stats`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const { message } = await parseError(
+        res,
+        "Failed to fetch category stats.",
+      );
       return { ok: false, error: message };
     }
     const body = await res.json();

@@ -3,13 +3,15 @@
 import {
   Product,
   ProductCategoryRef,
+  ProductStats,
   deleteProductAction,
+  getProductStatsAction,
   listProductsAction,
 } from "@/app/actions/product";
 import Pagination from "@/components/shared/Pagination";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
   BiBox,
@@ -17,12 +19,16 @@ import {
   BiPackage,
   BiPencil,
   BiPlus,
+  BiSearch,
   BiStar,
   BiTrash,
   BiXCircle,
 } from "react-icons/bi";
 
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 400;
+
+type StatusFilter = "all" | "active" | "inactive";
 
 const currency = (value: number) =>
   `৳${value.toLocaleString("en-BD", { maximumFractionDigits: 2 })}`;
@@ -34,42 +40,87 @@ const categoryName = (category: Product["category"]): string =>
 
 const ProductList = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [stats, setStats] = useState<ProductStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Only the latest request may write state — a slow response for an older
+  // page/search must not overwrite a newer one.
+  const requestId = useRef(0);
 
   const fetchProducts = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
-    const res = await listProductsAction();
+    const res = await listProductsAction({
+      page,
+      limit: PAGE_SIZE,
+      sort: "newest",
+      search: search || undefined,
+      isActive: status === "all" ? undefined : status === "active",
+    });
+    if (id !== requestId.current) return;
+
     if (res.ok && res.data) {
+      // Deleting the last item on the last page leaves us past the end.
+      if (res.data.products.length === 0 && page > 1) {
+        setPage(res.data.totalPages);
+        return;
+      }
       setProducts(res.data.products);
+      setTotal(res.data.total);
+      setTotalPages(res.data.totalPages);
     } else {
       toast.error(res.error || "Failed to load products");
     }
     setLoading(false);
+  }, [page, search, status]);
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    const res = await getProductStatsAction();
+    if (res.ok && res.data) {
+      setStats(res.data);
+    } else {
+      toast.error(res.error || "Failed to load product stats");
+    }
+    setStatsLoading(false);
   }, []);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedProducts = useMemo(
-    () =>
-      products.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [products, currentPage],
-  );
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
-  // Statistics
-  const totalProducts = products.length;
-  const activeProducts = products.filter((p) => p.isActive).length;
-  const inactiveProducts = products.filter((p) => !p.isActive).length;
-  const featuredProducts = products.filter((p) => p.isFeatured).length;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  const stats = [
+  const handleStatusChange = (value: StatusFilter) => {
+    setStatus(value);
+    setPage(1);
+  };
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
+  const isFiltered = Boolean(search) || status !== "all";
+
+  const statCards = [
     {
       title: "Total Products",
-      value: totalProducts,
+      value: stats?.total ?? 0,
       subtitle: "All catalog items",
       icon: <BiPackage size={20} />,
       color: "bg-primary/10",
@@ -77,7 +128,7 @@ const ProductList = () => {
     },
     {
       title: "Active",
-      value: activeProducts,
+      value: stats?.active ?? 0,
       subtitle: "Visible in the storefront",
       icon: <BiCheckCircle size={20} />,
       color: "bg-green-50",
@@ -85,7 +136,7 @@ const ProductList = () => {
     },
     {
       title: "Inactive",
-      value: inactiveProducts,
+      value: stats?.inactive ?? 0,
       subtitle: "Hidden from customers",
       icon: <BiXCircle size={20} />,
       color: "bg-red-50",
@@ -93,7 +144,7 @@ const ProductList = () => {
     },
     {
       title: "Featured",
-      value: featuredProducts,
+      value: stats?.featured ?? 0,
       subtitle: "Highlighted products",
       icon: <BiStar size={20} />,
       color: "bg-purple-50",
@@ -107,8 +158,10 @@ const ProductList = () => {
 
     const res = await deleteProductAction(product._id);
     if (res.ok) {
-      setProducts((prev) => prev.filter((p) => p._id !== product._id));
       toast.success("Product deleted");
+      // Refetch so the page backfills from the next one and counts stay right.
+      fetchProducts();
+      fetchStats();
     } else {
       toast.error(res.error || "Failed to delete product");
     }
@@ -137,7 +190,7 @@ const ProductList = () => {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <div
             key={index}
             className="rounded border border-gray-200 bg-white p-5 hover:shadow-sm transition-shadow"
@@ -153,7 +206,7 @@ const ProductList = () => {
               </h3>
             </div>
             <p className="mb-1 text-3xl font-bold text-gray-900">
-              {loading ? (
+              {statsLoading ? (
                 <span className="block h-8 w-16 bg-gray-100 animate-pulse rounded"></span>
               ) : (
                 stat.value
@@ -166,6 +219,38 @@ const ProductList = () => {
 
       {/* Products Table */}
       <div className="rounded border border-gray-200 bg-white overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-xs">
+            <BiSearch
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by title or SKU"
+              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
+            />
+          </div>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5">
+            {(["all", "active", "inactive"] as StatusFilter[]).map((value) => (
+              <button
+                key={value}
+                onClick={() => handleStatusChange(value)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                  status === value
+                    ? "bg-black text-white"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -217,7 +302,7 @@ const ProductList = () => {
                       </td>
                     </tr>
                   ))
-                : paginatedProducts.map((product) => (
+                : products.map((product) => (
                     <tr
                       key={product._id}
                       className="hover:bg-gray-50 transition-colors"
@@ -326,18 +411,28 @@ const ProductList = () => {
               <BiPackage size={32} className="text-gray-300" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-1">
-              No products yet
+              {isFiltered ? "No matching products" : "No products yet"}
             </h3>
             <p className="text-gray-500 text-sm max-w-xs mx-auto">
-              Add your first product to start building the catalog.
+              {isFiltered
+                ? "Try a different search or status filter."
+                : "Add your first product to start building the catalog."}
             </p>
           </div>
         )}
 
-        {!loading && products.length > 0 && totalPages > 1 && (
-          <div className="border-t border-gray-200 px-6 py-4">
+        {total > 0 && (
+          <div className="flex flex-col gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              Showing{" "}
+              <span className="font-medium text-gray-900">
+                {rangeStart}–{rangeEnd}
+              </span>{" "}
+              of <span className="font-medium text-gray-900">{total}</span>{" "}
+              products
+            </p>
             <Pagination
-              currentPage={currentPage}
+              currentPage={page}
               totalPages={totalPages}
               onPageChange={setPage}
             />

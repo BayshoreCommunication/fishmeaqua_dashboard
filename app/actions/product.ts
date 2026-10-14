@@ -46,12 +46,29 @@ export interface ProductListResult {
   totalPages: number;
 }
 
+export type ProductSort =
+  | "default"
+  | "newest"
+  | "price-low"
+  | "price-high"
+  | "name";
+
 export interface ListProductsParams {
   page?: number;
   limit?: number;
   category?: string;
   search?: string;
   isActive?: boolean;
+  isFeatured?: boolean;
+  sort?: ProductSort;
+}
+
+export interface ProductStats {
+  total: number;
+  active: number;
+  inactive: number;
+  featured: number;
+  outOfStock: number;
 }
 
 interface ProductDataResponse<T = unknown> {
@@ -95,6 +112,10 @@ export async function listProductsAction(
     if (params.isActive !== undefined) {
       query.set("isActive", String(params.isActive));
     }
+    if (params.isFeatured !== undefined) {
+      query.set("isFeatured", String(params.isFeatured));
+    }
+    if (params.sort) query.set("sort", params.sort);
 
     const qs = query.toString();
     const res = await fetch(`${API}/products${qs ? `?${qs}` : ""}`, {
@@ -103,6 +124,34 @@ export async function listProductsAction(
     });
     if (!res.ok) {
       const { message } = await parseError(res, "Failed to fetch products.");
+      return { ok: false, error: message };
+    }
+    const body = await res.json();
+    return { ok: true, data: body.data };
+  } catch {
+    return { ok: false, error: "Network error. Please try again." };
+  }
+}
+
+// ── Catalog-wide product counts (manager/admin/superadmin only) ───────────────
+
+export async function getProductStatsAction(): Promise<
+  ProductDataResponse<ProductStats>
+> {
+  const token = await getAuthToken();
+  if (!token) return { ok: false, error: "Not authenticated." };
+
+  try {
+    const res = await fetch(`${API}/products/stats`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const { message } = await parseError(
+        res,
+        "Failed to fetch product stats.",
+      );
       return { ok: false, error: message };
     }
     const body = await res.json();

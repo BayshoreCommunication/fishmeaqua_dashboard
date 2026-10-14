@@ -11,13 +11,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import {
-  BiArrowBack,
-  BiBox,
-  BiCheck,
-  BiPencil,
-  BiTrash,
-} from "react-icons/bi";
+import { BiArrowBack, BiBox, BiPencil, BiTrash } from "react-icons/bi";
 
 const currency = (value: number) =>
   `৳${value.toLocaleString("en-BD", { maximumFractionDigits: 2 })}`;
@@ -198,11 +192,6 @@ const ProductDetails = () => {
         )
       : null;
 
-  const features = (product.shortDescription || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
   return (
     <div className="flex flex-col gap-6 bg-gray-50 min-h-screen">
       {/* Header */}
@@ -291,6 +280,11 @@ const ProductDetails = () => {
             <h1 className="mt-1 text-2xl font-bold text-gray-900">
               {product.title}
             </h1>
+            {product.shortDescription && (
+              <p className="mt-1 text-sm text-gray-600">
+                {product.shortDescription}
+              </p>
+            )}
             <p className="mt-1 text-sm text-gray-400">SKU: {product.sku}</p>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -348,29 +342,6 @@ const ProductDetails = () => {
                 Sold per {product.weight} {product.unit}
               </p>
             </div>
-
-            {/* Features (short description) */}
-            {features.length > 0 && (
-              <div className="mt-5">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Key Features
-                </h3>
-                <ul className="mt-2.5 space-y-2">
-                  {features.map((line, i) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-2 text-sm text-gray-700"
-                    >
-                      <BiCheck
-                        size={18}
-                        className="mt-0.5 shrink-0 text-primary-dark"
-                      />
-                      {line}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             {/* Details — structured label/value list */}
             <div className="mt-5 border-t border-gray-200 pt-4">
